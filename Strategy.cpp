@@ -488,3 +488,18 @@ void Defend ( Robot *robot, Environment *env, double low, double high )
 
 	NearBound2 ( robot, vl ,vr, env );
 }
+
+void JishnuAttack(Robot *robot, Environment *env)
+{
+
+}
+
+void JishnuGoalie(Robot *robot, Environment *env)
+{
+
+}
+
+void JishnuDefend(Robot *robot, Environment *env)
+{
+
+}

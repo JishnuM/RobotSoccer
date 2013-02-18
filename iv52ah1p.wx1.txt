@@ -1,0 +1,30 @@
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+# On branch master
+#
+# Initial commit
+#
+# Changes to be committed:
+#   (use "git rm --cached <file>..." to unstage)
+#
+#	new file:   ReadMe.txt
+#	new file:   Strategy.cpp
+#
+# Untracked files:
+#   (use "git add <file>..." to include in what will be committed)
+#
+#	.gitattributes
+#	.gitignore
+#	StdAfx.cpp
+#	StdAfx.h
+#	Strategy.dsp
+#	Strategy.dsw
+#	Strategy.h
+#	Strategy.sln
+#	Strategy.vcxproj
+#	Strategy.vcxproj.filters
+#	UpgradeLog.htm
+#	UpgradeLog2.htm
+#	UpgradeLog3.htm
+

@@ -3,15 +3,12 @@
 
 #include "stdafx.h"
 #include "Strategy.h"
-#include <iostream>
 #include <math.h>
-
-using namespace std;
 
 BOOL APIENTRY DllMain( HANDLE hModule, 
                        DWORD  ul_reason_for_call, 
                        LPVOID lpReserved
-					 )
+        			 )
 {
     switch (ul_reason_for_call)
 	{
@@ -24,20 +21,17 @@ BOOL APIENTRY DllMain( HANDLE hModule,
     return TRUE;
 }
 
-
-
 const double PI = 3.1415923;
 
 char myMessage[200]; //big enough???
 
 void PredictBall ( Environment *env );
 void Goalie1 ( Robot *robot, Environment *env );
-void NearBound2 ( Robot *robot, double vl, double vr, Environment *env );
-void Attack2 ( Robot *robot, Environment *env );
-void Defend ( Robot *robot, Environment *env, double low, double high );
 void Jish_Defend1(Robot *robot, Environment *env);
 void Jish_Defend2(Robot *robot, Environment *env);
 void Jish_Attack(Robot *robot, Environment *env);
+void Jish_Support(Robot *robot, Environment *env);
+void DoCross(Robot *robot, Environment *env);
 // by moon at 9/2/2002
 void MoonAttack (Robot *robot, Environment *env );
 // just for testing to check whether the &env->opponent works or not
@@ -51,14 +45,11 @@ void Position( Robot *robot, double x, double y );
 extern "C" STRATEGY_API void Create ( Environment *env )
 {
 	// allocate user data and assign to env->userData
-	// eg. env->userData = ( void * ) new MyVariables ();
 }
 
 extern "C" STRATEGY_API void Destroy ( Environment *env )
 {
 	// free any user data created in Create ( Environment * )
-
-	// eg. if ( env->userData != NULL ) delete ( MyVariables * ) env->userData;
 }
 
 
@@ -80,7 +71,7 @@ extern "C" STRATEGY_API void Strategy ( Environment *env )
 			//MoonFollowOpponent ( &env->home [3], &env->opponent [4] );
 			Jish_Defend1(&env->home[1], env);
 			Jish_Defend2(&env->home[2], env);
-			Jish_Attack(&env->home[3], env);
+			Jish_Support(&env->home[3],env);
 			Jish_Attack(&env->home[4], env);
 			Goalie1 ( &env->home [0], env );
 
@@ -95,7 +86,7 @@ extern "C" STRATEGY_API void Strategy ( Environment *env )
 			Jish_Defend1(&env->home[1], env);
 			Jish_Defend2(&env->home[2], env);
 
-			Jish_Attack(&env->home[3], env);
+			Jish_Support(&env->home[3],env);
 			Jish_Attack(&env->home[4], env);
 
 			// Goal keeper
@@ -148,7 +139,6 @@ extern "C" STRATEGY_API void Strategy ( Environment *env )
 			break;
   }
 }
-
 
 double Distance(double x1, double y1, double x2, double y2)
 {
@@ -208,7 +198,7 @@ void Angle ( Robot *robot, int desired_angle)
 
 void Position( Robot *robot, double x, double y )
 {
-	int desired_angle = 0, theta_e = 0, d_angle = 0, vl, vr, vc = 70;
+	int desired_angle = 0, theta_e = 0, d_angle = 0, vl, vr, vc = 125;
 
 	double dx, dy, d_e, Ka = 10.0/90.0;
 	dx = x - robot->pos.x;
@@ -278,136 +268,96 @@ void PredictBall ( Environment *env )
 
 }
 
-double PredictGoal (Environment *env )
+double PredictGoalRight (Environment *env )
 {
-	double dx = env->currentBall.pos.x - env->lastBall.pos.x;
-	double dy = env->currentBall.pos.y - env->lastBall.pos.y;
-	double k = env->currentBall.pos.y -(dy/dx)*(env->currentBall.pos.x);
+	double dx = env->predictedBall.pos.x - env->currentBall.pos.x;
+	double dy = env->predictedBall.pos.y - env->currentBall.pos.y;
+	double k = env->predictedBall.pos.y -(dy/dx)*(env->predictedBall.pos.x);
 	double goalY = (dy/dx)*GRIGHT + k;
 	return goalY;
 }
 
-void Goalie1 ( Robot *robot, Environment *env )
+double PredictGoalLeft (Environment *env )
 {
-	double yCentre = (env->fieldBounds.top + env->fieldBounds.bottom)/2 - 11;
-	//double yCentre = 42;
-
-	//Left if yellow, Right if blue
-	//Arbitrary Constants Are Sad
-	double xCentre = (env->fieldBounds.right + 15.5);
-	
-	//double xCentre = 90.5;
-
-	Vector3D nowBall = env->currentBall.pos;
-	Vector3D futureBall = env->predictedBall.pos;
-	double yIdeal = 0;
-	double xIdeal = xCentre;
-
-	double fieldLength = env->fieldBounds.left - env->fieldBounds.right;
-	double fieldRatio = (nowBall.x - env->fieldBounds.right)/fieldLength;
-
-	if (fieldRatio > 1/5)
-	{
-		//double width = env->fieldBounds.top - env->fieldBounds.bottom;
-		if (nowBall.y - env->fieldBounds.bottom < (1/3)*(env->fieldBounds.top - env->fieldBounds.bottom))
-		{
-			//cout<<"Bottom third"<<endl;
-			yIdeal = yCentre - 3;
-
-		}
-		else if (nowBall.y - env->fieldBounds.bottom < (2/3)*(env->fieldBounds.top - env->fieldBounds.bottom))
-		{
-			//cout<<"Middle third"<<endl;
-			yIdeal = yCentre;
-		}
-		else
-		{
-			//cout<<"Top third"<<endl;
-			yIdeal = yCentre + 3;
-		}
-		Position(robot,xCentre,yIdeal);
-	}
-	//In your quarter of the field
-	else
-	{
-		/*
-		if(nowBall.y < (1/3)*(env->fieldBounds.top))
-		{
-			if (Distance(robot->pos.x,robot->pos.y,xCentre,yCentre) > 0.5)
-			{
-				Position(robot,xCentre,yCentre);
-			}
-			else
-			{
-				robot->velocityLeft = 125;
-				robot->velocityRight = -125;
-			}
-		}
-		else if(nowBall.y < (2/3)*(env->fieldBounds.top) )
-		{
-			xIdeal = nowBall.x;
-			yIdeal = nowBall.y;
-			Position(robot,xIdeal,yIdeal);
-		}
-		else
-		{
-			if (Distance(robot->pos.x,robot->pos.y,xCentre,yCentre) > 0.5)
-			{
-				Position(robot,xCentre,yCentre);
-			}
-			else
-			{
-				robot->velocityLeft = 125;
-				robot->velocityRight = -125;
-			}
-		}
-		*/
-		if (nowBall.y > robot->pos.y)
-		{
-			robot->velocityLeft = 125;
-			robot->velocityRight = -125;
-		}
-		else if (nowBall.y < robot->pos.y)
-		{
-			robot->velocityLeft = -125;
-			robot->velocityRight = 125;
-		}
-		else
-		{
-			Position(robot,futureBall.x,futureBall.y);
-		}
-	}
-
-	//double dist_to_ideal = Distance(robot->pos.x,robot->pos.y,xIdeal,yIdeal);
-
-	//if (dist_to_ideal > 0.1)
-	//{
-		//cout<<"Shift!"<
-	//else
-	//{
-		//cout<<"Meh"<<endl;
-		//Angle(robot,0);
-		//robot->velocityLeft = 0;
-		//robot->velocityRight = 0;
-	//}
-	//Position(robot,xIdeal,yIdeal);
-	//Angle(robot,0);
+	double dx = env->currentBall.pos.x - env->lastBall.pos.x;
+	double dy = env->currentBall.pos.y - env->lastBall.pos.y;
+	double k = env->currentBall.pos.y -(dy/dx)*(env->currentBall.pos.x);
+	double goalY = (dy/dx)*GLEFT + k;
+	return goalY;
 }
 
+//void Goalie1 ( Robot *robot, Environment *env )
+//{
+	//
+	//double yCentre = (env->fieldBounds.top + env->fieldBounds.bottom)/2 - 11;
+	////double yCentre = 42;
+
+	////Left if yellow, Right if blue
+	////Arbitrary Constants Are Sad
+	//double xCentre = (env->fieldBounds.right + 13);
+	//
+	////double xCentre = 90.5;
+
+	//Vector3D nowBall = env->currentBall.pos;
+	//Vector3D futureBall = env->predictedBall.pos;
+	//double yIdeal = 0;
+//	double xIdeal = xCentre;
+//
+//	double ideal_pos = PredictGoalRight(env);
+	//if (ideal_pos > GTOPY){ideal_pos = GTOPY - 1;}
+	//if (ideal_pos < GBOTY){ideal_pos = GBOTY + 1;}
+	//
+	//Position(robot,xCentre,ideal_pos);
+//}
+void Goalie1 ( Robot *robot, Environment *env )
+{
+    double xCentre = (env->fieldBounds.left + 2);
+
+	double ideal_pos = env->currentBall.pos.y;
+	if (ideal_pos > GTOPY){ideal_pos = GTOPY;}
+	else if (ideal_pos < GBOTY){ideal_pos = GBOTY;}
+	Position(robot,xCentre,ideal_pos);
+}
 void Jish_Defend1 (Robot *robot, Environment *env)
 {
 	Vector3D ball_pos = env->currentBall.pos;
 	OpponentRobot* target;
-	double target_x = 0;
+	double target_x = 100;
 	for (int i = 0; i < 5; i++)
 	{
-		if (env->opponent[i].pos.x > target_x)
+		if (env->opponent[i].pos.x < target_x)
 		{
 			target = &env->opponent[i];
 			target_x = env->opponent[i].pos.x;
 		}
 	}
-	MoonFollowOpponent(robot,target);
+	//MoonFollowOpponent(robot,target);
+	//akshat
+	double x, y;
+	
+	if (ball_pos.x>50)
+	{
+	x = (ball_pos.x/2) - 50;
+	y = ball_pos.y+1;
+	Position(robot, x, y);
+	}
+	else if ((robot->pos.x > ball_pos.x-3)&& ball_pos.x < 50)
+		{
+			x = ball_pos.x-3;
+			if (ball_pos.y<42)
+				y = ball_pos.y-2;
+
+			if (ball_pos.y>=42)
+				y = ball_pos.y+2;
+
+			Position(robot, x, y);
+		}
+	if ((robot->pos.x <= ball_pos.x-3) && robot->pos.x < 50)
+		{
+			x = ball_pos.x;
+			y = ball_pos.y;
+			Position(robot, x, y);
+		}
 }
 
 void Jish_Defend2 (Robot *robot, Environment *env)
@@ -415,297 +365,118 @@ void Jish_Defend2 (Robot *robot, Environment *env)
 	Vector3D ball_pos = env->currentBall.pos;
 	OpponentRobot* buffer = nullptr;
 	OpponentRobot* target = nullptr;
-	double buffer_x = 0, target_x = 0;
+	double buffer_x = 100, target_x = 100;
 	for (int i = 0; i < 5; i++)
 	{
-		if (env->opponent[i].pos.x > buffer_x)
+		if (env->opponent[i].pos.x < buffer_x)
 		{
 			target = buffer;
 			target_x = buffer_x;
 			buffer = &env->opponent[i];
 			buffer_x = env->opponent[i].pos.x;
 		}
-		else if (env->opponent[i].pos.x > target_x)
+		else if (env->opponent[i].pos.x < target_x)
 		{
 			target = &env->opponent[i];
 			target_x = env->opponent[i].pos.x;
 		}
 	}
-	MoonFollowOpponent(robot,target);
-}
-
-void Jish_Attack(Robot *robot, Environment *env)
-{
-	double x_val = robot->pos.x;
-	double y_val = robot->pos.y;
-	Vector3D nowBall = env->currentBall.pos;
-	//BlueBall
-	if (env->whosBall == BLUE_BALL)
-	{
-		//If You Have the ball
-		if (Distance(x_val,y_val,nowBall.x,nowBall.y) < 0.2)
-		{
-			//If Near the Goal
-			if (Distance(x_val,y_val,GLEFT,(GTOPY+GBOTY)/2) <= 5)
-			{
-				Position(robot,GLEFT,(GTOPY+GBOTY)/2);
-			}
-			else
-			{
-				//Left (Bottom) Half
-				if (y_val - env->fieldBounds.bottom < (1/2)*(env->fieldBounds.top - env->fieldBounds.bottom))
-				{
-					Position(robot,env->goalBounds.left,env->fieldBounds.bottom);
-				}
-				//Right Half
-				else
-				{
-					Position(robot,env->goalBounds.left,env->fieldBounds.top);
-				}
-			}
-		}
-		//If You Don't Have the Ball
-		else
-		{
-			Position(robot,env->currentBall.pos.x,env->currentBall.pos.y);
-		}
-	}
-	//Yellow
-	else if (env->whosBall == YELLOW_BALL)
-	{
-		/*
-		if (y_val - env->fieldBounds.bottom < (1/2)*(env->fieldBounds.top - env->fieldBounds.bottom))
-		{
-			Position(robot,(GLEFT+GRIGHT)/2,(GBOTY + (1/3)*GTOPY));
-		}
-		else
-		{
-			Position(robot,(GLEFT+GRIGHT)/2,(GBOTY + (2/3)*GTOPY));
-		}
-		*/
-		Position(robot,env->currentBall.pos.x,env->currentBall.pos.y);
-	}
-	else
-	{
-		/*
-		if (y_val - env->fieldBounds.bottom < (1/2)*(env->fieldBounds.top - env->fieldBounds.bottom))
-		{
-			Position(robot,(GLEFT+GRIGHT)/2,(GBOTY + (1/3)*GTOPY));
-		}
-		else
-		{
-			Position(robot,(GLEFT+GRIGHT)/2,(GBOTY + (2/3)*GTOPY));
-		}
-		*/
-		Position(robot,env->currentBall.pos.x,env->currentBall.pos.y);
-	}
-
-}
-
-void Attack2 ( Robot *robot, Environment *env )
-{
-	Vector3D t = env->currentBall.pos;
-	double r = robot->rotation;
-	if ( r < 0 ) r += 360;
-	if ( r > 360 ) r -= 360;
-	double vl = 0, vr = 0;
-
-	//Error Correction Code
-	//If the ball position is recorded as outside limits, it is made as per limits
-	//Why 3/2.5 etc?
-	if ( t.y > env->fieldBounds.top - 2.5 ) t.y = env->fieldBounds.top - 2.5;
-	if ( t.y < env->fieldBounds.bottom + 2.5 ) t.y = env->fieldBounds.bottom + 2.5;
-	if ( t.x > env->fieldBounds.right - 3 ) t.x = env->fieldBounds.right - 3;
-	if ( t.x < env->fieldBounds.left + 3 ) t.x = env->fieldBounds.left + 3;
-
-	//Difference between robot position and ball position
-	double dx = robot->pos.x - t.x;
-	double dy = robot->pos.y - t.y;
-
-	//Dafaq
-	//Does this even care about the goal?
 	
-	double dxAdjusted = dx;
-	double angleToPoint = 0;
-
-
-	if ( fabs ( robot->pos.y - t.y ) > 7 || t.x > robot->pos.x )
-		dxAdjusted -= 5;
-
-	if ( dxAdjusted == 0 )
+	//MoonFollowOpponent(robot, target);
+	//by akshat
+    
+	double x, y;
+	if (ball_pos.x>50)
 	{
-		if ( dy > 0 )
-			angleToPoint = 270;
-		else
-			angleToPoint = 90;
+	x = (ball_pos.x/2) - 50;
+	y = ball_pos.y-1;
+	Position(robot, x, y);
 	}
-	else if ( dy == 0 )
-	{
-		if ( dxAdjusted > 0 )
-			angleToPoint = 360;
-		else
-			angleToPoint = 180;
-		
-	}
-	else
-		angleToPoint = atan ( fabs ( dy / dx ) ) * 180.0 / PI;
-
-	if ( dxAdjusted > 0 )
-	{
-		if ( dy > 0 )
-			angleToPoint -= 180;
-		else if ( dy < 0 )
-			angleToPoint = 180 - angleToPoint;
-	}
-	if ( dxAdjusted < 0 )
-	{
-		if ( dy > 0 )
-			angleToPoint = - angleToPoint;
-		else if ( dy < 0 )
-			angleToPoint = 90 - angleToPoint;
-	}
-
-	if ( angleToPoint < 0 ) angleToPoint = angleToPoint + 360;
-	if ( angleToPoint > 360 ) angleToPoint = angleToPoint - 360;
-	if ( angleToPoint > 360 ) angleToPoint = angleToPoint - 360;
-
-	double c = r;
-
-	double angleDiff = fabs ( r - angleToPoint );
-
-	if ( angleDiff < 40 )
-	{
-		vl = 100;
-		vr = 100;
-		if ( c > angleToPoint )
-			vl -= 10;
-		if ( c < angleToPoint )
-			vr -= 10;
-	}
-	else
-	{
-		if ( r > angleToPoint )
+	if ((robot->pos.x > ball_pos.x-3) && ball_pos.x < 50)
 		{
-			if ( angleDiff > 180 )
-				vl += 360 - angleDiff;
-			else
-				vr += angleDiff;
+			x = ball_pos.x-3;
+			if (ball_pos.y<42)
+				y = ball_pos.y-2;
+
+			if (ball_pos.y>=42)
+				y = ball_pos.y+2;
+			Position(robot, x, y);
 		}
-		if ( r < angleToPoint )
+	if ((robot->pos.x <= ball_pos.x-3) && robot->pos.x < 50)
 		{
-			if ( angleDiff > 180 )
-				vr += 360 - angleDiff;
-			else
-				vl += angleDiff;
+			x = ball_pos.x;
+			y = ball_pos.y;
+			Position(robot, x, y);
 		}
 	}
 
-	NearBound2 ( robot, vl, vr, env );
-}
-
-void NearBound2 ( Robot *robot, double vl, double vr, Environment *env )
+void Jish_Support(Robot *robot, Environment *env)
 {
-	//Vector3D t = env->currentBall.pos;
-
-	Vector3D a = robot->pos;
-	double r = robot->rotation;
-
-	if ( a.y > env->fieldBounds.top - 15 && r > 45 && r < 130 )
+    double ball_dist = Distance(robot->pos.x,robot->pos.y,env->currentBall.pos.x,env->currentBall.pos.y);
+	double goal_dist = Distance(robot->pos.x,robot->pos.y,FRIGHTX,(FBOT + (1/2)*FTOP));
+	if (ball_dist < 1 && goal_dist < 30)
 	{
-		if ( vl > 0 )
-			vl /= 3;
-		if ( vr > 0 )
-			vr /= 3;
+		Position(robot,FRIGHTX,(FBOT + (1/2)*FTOP));
 	}
-
-	if ( a.y < env->fieldBounds.bottom + 15 && r < -45 && r > -130 )
+	else if (ball_dist < 1)
 	{
-		if ( vl > 0 ) vl /= 3;
-		if ( vr > 0 ) vr /= 3;
+		if (env->currentBall.pos.x < robot->pos.x){
+			double x_suggested = env->predictedBall.pos.x-2;
+			if (x_suggested < FLEFTX + (1/3)*FRIGHTX){x_suggested = FLEFTX + (1/3)*FRIGHTX;}
+			Position(robot,x_suggested,env->predictedBall.pos.y);
+		}
+		else
+		{
+			Position(robot,GRIGHT,GBOTY);
+		}
 	}
-
-	if ( a.x > env->fieldBounds.right - 10 )
+	else
 	{
-		if ( vl > 0 )
-			vl /= 2;
-		if ( vr > 0 )
-			vr /= 2;
-	}
+		double dx = env->currentBall.pos.x - env->lastBall.pos.x;
+		double dy = env->currentBall.pos.y - env->lastBall.pos.y;
+		double m1 = (dy/dx);
+		double m2 = -(dx/dy);
+		double k1 = env->currentBall.pos.y -(m1)*(env->currentBall.pos.x);
+		double k2 = robot->pos.y - (m2)*(robot->pos.x);
+		double x_return = (k2 - k1)/(m1 - m2);
+		double y_return = m2*(x_return) + k2;
 
-	if ( a.x < env->fieldBounds.left + 10 )
-	{
-		if ( vl > 0 )
-			vl /= 2;
-		if ( vr > 0 )
-			vr /= 2;
+		if (x_return < FLEFTX + (1/3)*FRIGHTX){x_return = (FLEFTX + (1/3)*FRIGHTX);}
+	
+		Position(robot,x_return,y_return);
 	}
-
-	robot->velocityLeft = vl;
-	robot->velocityRight = vr;
 }
 
-void Defend ( Robot *robot, Environment *env, double low, double high )
+void Jish_Attack(Robot *robot,Environment *env)
 {
-	double vl = 0, vr = 0;
-	Vector3D z = env->currentBall.pos;
-
-	double Tx = env->goalBounds.right - z.x;
-	double Ty = env->fieldBounds.top - z.y;
-	Vector3D a = robot->pos;
-	a.x = env->goalBounds.right - a.x;
-	a.y = env->fieldBounds.top - a.y;
-
-	if ( a.y > Ty + 0.9 && a.y > low )
-	{
-		vl = -100;
-		vr = -100;
+	//Get Distances to Ball
+	double dist = Distance(env->currentBall.pos.x,env->currentBall.pos.y,robot->pos.x,robot->pos.y);
+	
+	/*if (robot->pos.x > (FLEFTX + (2/3)*FRIGHTX)){
+		Position(robot,(FLEFTX + (2/3)*FRIGHTX),env->currentBall.pos.y);
 	}
-	if ( a.y < Ty - 0.9 && a.y < high )
-	{
-		vl = 100;
-		vr = 100;
+	else{*/
+		if (env->currentBall.pos.x < robot->pos.x)
+		{
+			if(env->currentBall.pos.y > 42)
+			{
+				Position(robot,env->currentBall.pos.x-3,env->currentBall.pos.y-2);
+			}
+			else
+			{
+				Position(robot,env->currentBall.pos.x-3,env->currentBall.pos.y+2);
+			}
+		}
+		else
+		{
+			if (dist > .1)
+			{
+				Position(robot,env->currentBall.pos.x,env->currentBall.pos.y);
+			}
+			else
+			{
+				Position(robot,GRIGHT,FTOP + (1/2)*FBOT);
+			}
+		}
 	}
-	if ( a.y < low )
-	{
-		vl = 100;
-		vr = 100;
-	}
-	if ( a.y > high )
-	{
-		vl = -100;
-		vr = -100;
-	}
-
-	double Tr = robot->rotation;
-
-	if ( Tr < 0.001 )
-		Tr += 360;
-	if ( Tr > 360.001 )
-		Tr -= 360;
-	if ( Tr > 270.5 )
-		vr += fabs ( Tr - 270 );
-	else if ( Tr < 269.5 )
-		vl += fabs ( Tr - 270 );
-
-	NearBound2 ( robot, vl ,vr, env );
-}
-/*
-void JishnuAttack(Robot *robot, Environment *env)
-{
-	//2 Cases. Either ball is near or ball is not.
-	Vector 3D currentPos = env->currentBall.pos;
-
-
-}
-
-void JishnuGoalie(Robot *robot, Environment *env)
-{
-
-}
-
-void JishnuDefend(Robot *robot, Environment *env)
-{
-
-}
-*/
 
